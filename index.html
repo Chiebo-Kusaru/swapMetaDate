@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Меняй данные нахуй, свободно нахуй</title>
+<script src="https://cdn.jsdelivr.net/npm/piexifjs"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg:       #0a0e1a;
+    --surface:  #111827;
+    --card:     #1a2235;
+    --border:   #243050;
+    --accent:   #3b82f6;
+    --accent2:  #06b6d4;
+    --green:    #10b981;
+    --red:      #ef4444;
+    --amber:    #f59e0b;
+    --purple:   #a855f7;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --radius:   14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px 60px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(59,130,246,.12) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 30% at 80% 80%, rgba(6,182,212,.08) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { width: 860px; max-width: 100%; position: relative; z-index: 1; }
+
+  header { text-align: center; padding: 32px 0 28px; }
+  header h1 {
+    font-size: 2.4rem; font-weight: 800; letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  header p { color: var(--muted); font-size: .9rem; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 28px; margin-bottom: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+
+  .section-title {
+    font-size: .7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--accent2); margin-bottom: 14px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; }
+
+  input, select {
+    width: 100%; padding: 11px 14px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); font-size: .95rem; font-family: 'Syne', sans-serif;
+    outline: none; transition: border-color .2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+
+  .field { margin-bottom: 16px; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* ── THUMBNAILS ─────────────────────────────────────── */
+  #thumbsWrap {
+    display: none;
+    margin-top: 14px;
+  }
+  #thumbsWrap.visible { display: block; }
+  #thumbsGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .thumb-item {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    flex: 0 0 auto;
+    width: 96px;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color .2s, transform .15s;
+    cursor: default;
+  }
+  .thumb-item:hover { border-color: var(--accent); transform: scale(1.04); }
+  .thumb-item img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .thumb-item .thumb-video-icon {
+    font-size: 2.2rem;
+    opacity: .7;
+  }
+  .thumb-item .thumb-label {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,.68);
+    padding: 3px 5px;
+    font-size: .58rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+  }
+  .thumb-item .thumb-badge {
+    position: absolute;
+    top: 5px; right: 5px;
+    font-size: .58rem;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+  .thumb-badge.img { background: rgba(59,130,246,.85); color: #fff; }
+  .thumb-badge.vid { background: rgba(168,85,247,.85); color: #fff; }
+
+  /* ── PROCESSING MODE ─────────────────────────────────── */
+  .proc-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .proc-mode-btn {
+    padding: 14px 8px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: .85rem;
+    text-align: center;
+    transition: all .2s;
+    user-select: none;
+    line-height: 1.4;
+  }
+  .proc-mode-btn .pm-icon { font-size: 1.6rem; display: block; margin-bottom: 5px; }
+  .proc-mode-btn .pm-desc {
+    display: block;
+    font-size: .67rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 400;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .proc-mode-btn:hover { border-color: var(--accent); color: var(--text); }
+  .proc-mode-btn.active[data-pm="metadata"]   { border-color: var(--amber); background: rgba(245,158,11,.12); color: var(--amber); }
+  .proc-mode-btn.active[data-pm="postprocess"]{ border-color: var(--purple); background: rgba(168,85,247,.12); color: var(--purple); }
+  .proc-mode-btn.active[data-pm="both"]       { border-color: var(--green);  background: rgba(16,185,129,.12); color: var(--green); }
+  .proc-mode-btn.active .pm-desc { color: inherit; opacity: .7; }
+
+  .pm-status {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .74rem;
+    color: var(--muted);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .pm-status .pm-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 5px;
+    font-size: .7rem; font-weight: 700;
+  }
+  .pm-tag.on  { background: rgba(16,185,129,.18); color: var(--green); }
+  .pm-tag.off { background: rgba(100,116,139,.12); color: var(--muted); text-decoration: line-through; }
+
+  /* ── SHOOTING MODE ─────────────────────────────────────── */
+  .mode-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+  .mode-btn {
+    padding: 10px 4px; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--surface); color: var(--muted); cursor: pointer;
+    font-size: .8rem; font-family: 'Syne', sans-serif; font-weight: 700;
+    text-align: center; transition: all .2s; user-select: none;
+  }
+  .mode-btn .mode-icon { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+  .mode-btn:hover { border-color: var(--accent); color: var(--text); }
+  .mode-btn.active { border-color: var(--accent); background: rgba(59,130,246,.15); color: var(--accent); }
+
+  .map-wrap {
+    border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border);
+    height: 500px; background: var(--surface); margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: .85rem;
+  }
+  #map { width: 100%; height: 100%; }
+
+  .files-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 999px;
+    background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.3);
+    color: var(--accent); font-size: .8rem; font-family: 'JetBrains Mono', monospace; margin-top: 8px;
+  }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-top: 8px; }
+
+  button.btn {
+    padding: 13px; border-radius: var(--radius); border: none;
+    font-size: .9rem; font-weight: 700; font-family: 'Syne', sans-serif;
+    cursor: pointer; transition: filter .2s, transform .1s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  button.btn:hover { filter: brightness(1.12); }
+  button.btn:active { transform: scale(.97); }
+  button.btn:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+  .btn-blue  { background: var(--accent); color: #fff; }
+  .btn-green { background: var(--green);  color: #fff; }
+  .btn-link {
+    display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
+    border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border);
+    color: var(--accent); text-decoration: none; font-size: .85rem;
+    font-family: 'Syne', sans-serif; font-weight: 700; transition: border-color .2s; cursor: pointer;
+    justify-content: center;
+  }
+  .btn-link:hover { border-color: var(--accent); }
+
+  /* Progress */
+  #progressWrap { display: none; margin-top: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  #progressWrap.visible { display: block; }
+  #progressBar { height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; transition: width .3s ease; }
+  #progressLabel { padding: 8px 14px; font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--muted); }
+
+  /* Post-process */
+  .pp-info {
+    margin-top: 16px; padding: 14px 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-family: 'JetBrains Mono', monospace; font-size: .74rem; color: var(--muted); line-height: 1.7;
+  }
+  .pp-info strong { color: var(--accent2); }
+
+  /* 8-step grid */
+  .pp-steps { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 10px; }
+  .pp-step {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 4px; text-align: center; font-size: .62rem;
+  }
+  .pp-step .pp-icon  { font-size: 1.0rem; display: block; margin-bottom: 3px; }
+  .pp-step .pp-name  { color: var(--accent); font-weight: 700; display: block; }
+  .pp-step .pp-val   { color: var(--muted); display: block; margin-top: 2px; }
+  .pp-step.active    { border-color: var(--accent2); background: rgba(6,182,212,.08); }
+  .pp-step.photo-only { opacity: 1; }
+  .pp-step.disabled-step { opacity: 0.35; }
+
+  /* Video note */
+  .video-note {
+    margin-top: 10px; padding: 10px 14px; background: rgba(168,85,247,.08);
+    border: 1px solid rgba(168,85,247,.25); border-radius: var(--radius);
+    font-family: 'JetBrains Mono', monospace; font-size: .72rem; color: var(--purple);
+    display: none;
+  }
+  .video-note.show { display: block; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1e1e2e; border: 1px solid var(--red); border-radius: var(--radius);
+    padding: 14px 22px; max-width: 480px; width: 90%;
+    display: flex; gap: 12px; align-items: flex-start;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    z-index: 999; font-family: 'JetBrains Mono', monospace; font-size: .82rem;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast .toast-icon  { font-size: 1.3rem; flex-shrink: 0; }
+  #toast .toast-where { color: var(--amber); font-weight: 700; display: block; margin-bottom: 2px; }
+  #toast .toast-msg   { color: var(--text); }
+  #toast.success { border-color: var(--green); }
+  #toast.success .toast-where { color: var(--green); }
+
+  .params-preview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; }
+  .param-chip { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: .72rem; }
+  .param-chip .pk { color: var(--muted); display: block; margin-bottom: 2px; }
+  .param-chip .pv { color: var(--accent2); font-weight: 700; }
+
+  /* metadata-only dim */
+  .card-postprocess.dimmed { opacity: .4; pointer-events: none; transition: opacity .3s; }
+  .card-metadata.dimmed    { opacity: .4; pointer-events: none; transition: opacity .3s; }
+
+  footer { text-align: center; color: var(--muted); font-size: .75rem; padding-top: 12px; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Menyay dannye nahuy, svobodno nahuy</h1>
+    <p>EXIF metadata editor · v5.0 · фото + видео · MP4 выход · реалистичная постобработка<br>майд ин раша, нахуй</p>
+  </header>
+
+  <!-- ── PHOTOS / VIDEOS ───────────────────────────────── -->
+  <div class="card">
+    <div class="section-title">📁 Файлы (фото и видео)</div>
+    <div class="field">
+      <label>Выберите до 5 файлов — любой формат фото (JPG, PNG, WebP, AVIF…) или видео (MP4, MOV, AVI, MKV, WebM…)</label>
+      <input id="files" type="file" accept="image/*,video/*" multiple>
+      <div class="files-badge" id="fileInfo">📷 Выбрано: 0 файлов</div>
+    </div>
+    <!-- THUMBNAILS -->
+    <div id="thumbsWrap">
+      <div style="font-size:.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:6px;">
+        📂 Превью выбранных файлов:
+      </div>
+      <div id="thumbsGrid"></div>
+    </div>
+  </div>
+
+  <!-- ── PROCESSING MODE ───────────────────────────────── -->
+  <div class="card">
+    <div class="section-title">⚙️ Режим обработки</div>
+    <div class="proc-mode-grid" id="procModeGrid">
+      <div class="proc-mode-btn" data-pm="metadata">
+        <span class="pm-icon">🏷️</span>
+        Только метаданные
+        <span class="pm-desc">Заменяет EXIF/GPS · постобработка выключена</span>
+      </div>
+      <div class="proc-mode-btn active" data-pm="both">
+        <span class="pm-icon">✨</span>
+        Всё сразу
+        <span class="pm-desc">Метаданные + визуальная обработка</span>
+      </div>
+      <div class="proc-mode-btn" data-pm="postprocess">
+        <span class="pm-icon">🎨</span>
+        Только постобработка
+        <span class="pm-desc">Визуальный пайплайн · EXIF не трогается</span>
+      </div>
+    </div>
+    <div class="pm-status" id="pmStatus"></div>
+  </div>
+
+  <!-- ── DEVICE & LOCATION ─────────────────────────────── -->
+  <div class="card card-metadata">
+    <div class="section-title">📱 Устройство и локация</div>
+    <div class="row-2">
+      <div class="field">
+        <label>Модель телефона</label>
+        <select id="phone"></select>
+      </div>
+      <div class="field">
+        <label>Предустановленная локация</label>
+        <select id="place"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Дата и время съёмки</label>
+      <input id="time" type="text" value="2026-05-02 14:30:00" placeholder="YYYY-MM-DD HH:MM:SS">
+    </div>
+    <div class="field">
+      <label>Или выберите точку на карте (приоритет над предустановленной локацией)</label>
+      <div class="map-wrap"><div id="map">Карта загружается…</div></div>
+      <div style="color:var(--muted);font-size:.78rem;font-family:'JetBrains Mono',monospace">
+        📍 Кликните по карте для точной геопривязки
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SHOOTING MODE ─────────────────────────────────── -->
+  <div class="card card-metadata">
+    <div class="section-title">🎞 Режим съёмки</div>
+    <p style="color:var(--muted);font-size:.82rem;margin-bottom:14px;font-family:'JetBrains Mono',monospace">
+      Режим автоматически подбирает реалистичные ISO, выдержку и вспышку.
+    </p>
+    <div class="mode-grid" id="modeGrid">
+      <div class="mode-btn active" data-mode="Daylight"><span class="mode-icon">☀️</span>Daylight</div>
+      <div class="mode-btn" data-mode="Indoor"><span class="mode-icon">🏠</span>Indoor</div>
+      <div class="mode-btn" data-mode="Night"><span class="mode-icon">🌙</span>Night</div>
+      <div class="mode-btn" data-mode="Club"><span class="mode-icon">🎉</span>Club</div>
+      <div class="mode-btn" data-mode="Selfie"><span class="mode-icon">🤳</span>Selfie</div>
+    </div>
+    <div id="paramsPreview" class="params-preview"></div>
+  </div>
+
+  <!-- ── POST-PROCESSING ───────────────────────────────── -->
+  <div class="card card-postprocess">
+    <div class="section-title">🎨 Постобработка v5 (реализм)</div>
+    <div class="pp-info">
+      <strong>Конвейер деградации v5</strong> — расширенная имитация реальной камеры.<br>
+      Фото: subpixel-shift → blur → gamma+chroma+drift+edge-noise → vignette(≤2%) → colorshift → sharpen → JPEG×1(нерег.) → JPEG×2 → EXIF<br>
+      Видео: blur → gamma+chroma+drift+edge-noise → vignette(≤2%) · аудио сохраняется · <strong>выход MP4 (H.264 при поддержке) или WebM VP9</strong>
+    </div>
+    <div class="pp-steps" id="ppSteps">
+      <div class="pp-step" id="pp-shift">
+        <span class="pp-icon">↔</span>
+        <span class="pp-name">SubPx</span>
+        <span class="pp-val">±0.4px</span>
+      </div>
+      <div class="pp-step" id="pp-blur">
+        <span class="pp-icon">🌫️</span>
+        <span class="pp-name">Blur</span>
+        <span class="pp-val">0.2–0.4px</span>
+      </div>
+      <div class="pp-step" id="pp-gamma">
+        <span class="pp-icon">☀</span>
+        <span class="pp-name">Gamma</span>
+        <span class="pp-val">±4%</span>
+      </div>
+      <div class="pp-step" id="pp-noise">
+        <span class="pp-icon">📡</span>
+        <span class="pp-name">EdgeNoise</span>
+        <span class="pp-val">edge+</span>
+      </div>
+      <div class="pp-step" id="pp-vignette">
+        <span class="pp-icon">🎨</span>
+        <span class="pp-name">Vig≤2%</span>
+        <span class="pp-val">+drift</span>
+      </div>
+      <div class="pp-step photo-only" id="pp-preshift">
+        <span class="pp-icon">🎨</span>
+        <span class="pp-name">PreShift</span>
+        <span class="pp-val">±2 ch</span>
+      </div>
+      <div class="pp-step photo-only" id="pp-sharpen">
+        <span class="pp-icon">🔪</span>
+        <span class="pp-name">Sharpen</span>
+        <span class="pp-val">USM light</span>
+      </div>
+      <div class="pp-step photo-only" id="pp-pass1">
+        <span class="pp-icon">🗜️</span>
+        <span class="pp-name">JPEG×1</span>
+        <span class="pp-val">irregular</span>
+      </div>
+    </div>
+    <div class="video-note" id="videoNote">
+      🎬 Обнаружено видео. Обработка идёт в реальном времени (1:1 к длительности ролика).
+      Аудиодорожка сохраняется. Выходной формат: <strong>MP4 (H.264)</strong> при поддержке браузером, иначе WebM VP9.
+    </div>
+  </div>
+
+  <!-- ── ACTIONS ───────────────────────────────────────── -->
+  <div class="card">
+    <div class="section-title">⚙️ Действия</div>
+    <div class="btn-row">
+      <button class="btn btn-blue"  id="btnRand"    onclick="UI.randomize()">🎲 Рандомизировать</button>
+      <button class="btn btn-green" id="btnProcess" onclick="ImageProcessing.processFiles()">✅ Обработать</button>
+      <a class="btn-link" href="https://jimpl.com/" target="_blank" rel="noopener noreferrer">🔍 Проверить EXIF</a>
+      <a class="btn-link" href="https://www.zerogpt.com/ai-image-detector" target="_blank" rel="noopener noreferrer">🔍 Проверить на ИИ</a>
+    </div>
+    <div id="progressWrap">
+      <div id="progressLabel">Подготовка…</div>
+      <div id="progressBar"></div>
+    </div>
+  </div>
+
+  <footer>меняй данные нахуй, свободно нахуй · v5.0 · данные изменяются только локально, файлы не загружаются на сервер</footer>
+</div>
+
+<!-- Toast -->
+<div id="toast">
+  <span class="toast-icon" id="toastIcon">⚠️</span>
+  <div>
+    <span class="toast-where" id="toastWhere"></span>
+    <span class="toast-msg"   id="toastMsg"></span>
+  </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js"></script>
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────
+const Helpers = (() => {
+  function showToast(where, msg, type = 'error') {
+    const toast = document.getElementById('toast');
+    document.getElementById('toastWhere').textContent = '[' + where + ']';
+    document.getElementById('toastMsg').textContent   = msg;
+    document.getElementById('toastIcon').textContent  = type === 'success' ? '✅' : '⚠️';
+    toast.className = type === 'success' ? 'show success' : 'show';
+    clearTimeout(toast._tid);
+    toast._tid = setTimeout(() => { toast.className = ''; }, 4500);
+  }
+  function randInt(min, max)   { return Math.floor(Math.random() * (max - min + 1)) + min; }
+  function randFloat(min, max) { return min + Math.random() * (max - min); }
+  function pick(arr)           { return arr[randInt(0, arr.length - 1)]; }
+  function degToRat(v) {
+    v = Math.abs(v);
+    const d = Math.floor(v), m = Math.floor((v - d) * 60);
+    const s = Math.round((((v - d) * 60) - m) * 60 * 100);
+    return [[d, 1], [m, 1], [s, 100]];
+  }
+  function fmtDateForExif(dateStr) { return dateStr.trim().replace(/-/g, ':'); }
+  return { showToast, randInt, randFloat, pick, degToRat, fmtDateForExif };
+})();
+
+
+// ─────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────
+const Data = (() => {
+  const cameraProfiles = {
+    'Apple iPhone 15 Pro':      { make: 'Apple',   lens: '6.86mm f/1.78', fnum: [178, 100], iso: 80,  flash: 0, focal: [686, 100], program: 2 },
+    'Apple iPhone 14 Pro Max':  { make: 'Apple',   lens: '6.86mm f/1.78', fnum: [178, 100], iso: 64,  flash: 0, focal: [686, 100], program: 2 },
+    'Samsung Galaxy S24 Ultra': { make: 'Samsung', lens: '6.30mm f/1.7',  fnum: [170, 100], iso: 50,  flash: 0, focal: [630, 100], program: 2 },
+    'Samsung Galaxy S23':       { make: 'Samsung', lens: '5.40mm f/1.8',  fnum: [180, 100], iso: 80,  flash: 0, focal: [540, 100], program: 2 },
+    'Google Pixel 9 Pro':       { make: 'Google',  lens: '6.81mm f/1.68', fnum: [168, 100], iso: 62,  flash: 0, focal: [681, 100], program: 2 },
+    'Xiaomi 15 Ultra':          { make: 'Xiaomi',  lens: '8.70mm f/1.63', fnum: [163, 100], iso: 50,  flash: 0, focal: [870, 100], program: 2 },
+    'Huawei P60 Pro':           { make: 'Huawei',  lens: '7.10mm f/1.4',  fnum: [140, 100], iso: 64,  flash: 0, focal: [710, 100], program: 2 },
+    'OnePlus 12':               { make: 'OnePlus', lens: '6.60mm f/1.6',  fnum: [160, 100], iso: 100, flash: 0, focal: [660, 100], program: 2 },
+    'Sony Xperia 1 VI':         { make: 'Sony',    lens: '6.90mm f/1.9',  fnum: [190, 100], iso: 100, flash: 0, focal: [690, 100], program: 2 },
+    'Nothing Phone 3':          { make: 'Nothing', lens: '5.70mm f/1.9',  fnum: [190, 100], iso: 80,  flash: 0, focal: [570, 100], program: 2 }
+  };
+  const phoneNames = Object.keys(cameraProfiles);
+  const places = {
+    'Мюнхен, Германия':      [48.137154,  11.576124],
+    'Берлин, Германия':      [52.52,      13.405],
+    'Амстердам, Нидерланды': [52.3676,     4.9041],
+    'Париж, Франция':        [48.8566,     2.3522],
+    'Нью-Йорк, США':         [40.7128,   -74.0060],
+    'Токио, Япония':         [35.6762,   139.6503]
+  };
+
+  function generateShootingParams(mode, seriesBase = null) {
+    const r = Helpers.randInt;
+    const modeRanges = {
+      Daylight: { iso: [50,  100],    expDen: [500, 2000], flash: 0 },
+      Indoor:   { iso: [200, 800],   expDen: [60,  200],  flash: 0 },
+      Night:    { iso: [1600,6400],  expDen: [4,   30],   flash: 0 },
+      Club:     { iso: [3200,12800], expDen: [15,  60],   flash: [0, 1, 24, 25] },
+      Selfie:   { iso: [100, 400],   expDen: [60,  120],  flash: [0, 1] }
+    };
+    const range = modeRanges[mode] || modeRanges['Daylight'];
+    let iso, expDen, flash;
+    if (seriesBase) {
+      const drift = v => Math.round(v * (0.88 + Math.random() * 0.24));
+      iso    = Math.min(Math.max(drift(seriesBase.iso), 50), 12800);
+      expDen = Math.min(Math.max(drift(seriesBase.expDen), 4), 4000);
+      flash  = seriesBase.flash;
+    } else {
+      iso    = r(range.iso[0], range.iso[1]);
+      expDen = r(range.expDen[0], range.expDen[1]);
+      flash  = Array.isArray(range.flash) ? range.flash[r(0, range.flash.length - 1)] : range.flash;
+    }
+    if (Math.random() < 0.30) {
+      const isoStops = [50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800,
+                        1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 12800];
+      const idx = isoStops.findIndex(v => v >= iso);
+      const delta = Helpers.randInt(-2, 2);
+      iso = isoStops[Math.max(0, Math.min(isoStops.length - 1, idx + delta))];
+    }
+    const ssApex = Math.round(Math.log2(expDen) * 100);
+    const whiteBalance = Math.random() < 0.15 ? 1 : 0;
+    const meteringModes = [1, 2, 2, 3, 5, 5, 5];
+    const meteringMode  = Helpers.pick(meteringModes);
+    return { iso, expNum: 1, expDen, flash, ssApex, whiteBalance, meteringMode };
+  }
+
+  return { cameraProfiles, phoneNames, places, generateShootingParams };
+})();
+
+
+// ─────────────────────────────────────────────────────────
+// POST-PROCESS
+// ─────────────────────────────────────────────────────────
+const PostProcess = (() => {
+
+  function buildLUT() {
+    const gamma    = Helpers.randFloat(0.96, 1.04);
+    const contrast = Helpers.randFloat(1.005, 1.025);
+    const invGamma = 1 / gamma;
+    const lut = new Uint8ClampedArray(256);
+    for (let i = 0; i < 256; i++) {
+      let v = i / 255;
+      v = Math.pow(v, invGamma);
+      v = (v - 0.5) * contrast + 0.5;
+      lut[i] = Math.max(0, Math.min(255, Math.round(v * 255)));
+    }
+    return lut;
+  }
+
+  function makePRNG() {
+    let seed = (Math.random() * 0xffffffff) >>> 0;
+    return function xrand() {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      return (seed >>> 0) / 0xffffffff;
+    };
+  }
+
+  function applyVignette(ctx, w, h) {
+    const strength = Helpers.randFloat(0.01, 0.02);
+    const cx = w / 2, cy = h / 2;
+    const r  = Math.sqrt(cx * cx + cy * cy);
+    const gr = ctx.createRadialGradient(cx, cy, r * 0.42, cx, cy, r);
+    gr.addColorStop(0, 'rgba(0,0,0,0)');
+    gr.addColorStop(1, `rgba(0,0,0,${strength.toFixed(4)})`);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  function applyPixelPass(imageData, w, h) {
+    const lut      = buildLUT();
+    const noiseAmt = Helpers.randFloat(3, 7);
+    const rBias = Helpers.randFloat(-2.5, 2.5), gBias = Helpers.randFloat(-2.5, 2.5), bBias = Helpers.randFloat(-2.5, 2.5);
+    const rGain = Helpers.randFloat(0.985, 1.015), gGain = Helpers.randFloat(0.985, 1.015), bGain = Helpers.randFloat(0.985, 1.015);
+    const driftR = Helpers.randFloat(-1.8, 1.8), driftG = Helpers.randFloat(-1.8, 1.8), driftB = Helpers.randFloat(-1.8, 1.8);
+    const chromaFade = Helpers.randFloat(0.97, 1.0);
+    const xrand = makePRNG();
+    const d = imageData.data;
+
+    if (w && h) {
+      const cx = w / 2, cy = h / 2;
+      for (let y = 0; y < h; y++) {
+        const ey = Math.abs(y - cy) / cy;
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const ex = Math.abs(x - cx) / cx;
+          const edgeBoost = 1 + Math.max(ex, ey) * 0.45;
+          let nr = lut[d[i]], ng = lut[d[i+1]], nb = lut[d[i+2]];
+          const luma = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+          const cf   = 1 - chromaFade;
+          nr = nr * chromaFade + luma * cf;
+          ng = ng * chromaFade + luma * cf;
+          nb = nb * chromaFade + luma * cf;
+          const lumaForN = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+          const nm = 1 + (1 - lumaForN / 255) * 0.6;
+          const n  = (xrand() - 0.5) * noiseAmt * nm * edgeBoost;
+          d[i]   = Math.max(0, Math.min(255, nr * rGain + rBias + driftR + n));
+          d[i+1] = Math.max(0, Math.min(255, ng * gGain + gBias + driftG + n));
+          d[i+2] = Math.max(0, Math.min(255, nb * bGain + bBias + driftB + n));
+        }
+      }
+    } else {
+      for (let i = 0; i < d.length; i += 4) {
+        let nr = lut[d[i]], ng = lut[d[i+1]], nb = lut[d[i+2]];
+        const luma = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+        const cf   = 1 - chromaFade;
+        nr = nr * chromaFade + luma * cf;
+        ng = ng * chromaFade + luma * cf;
+        nb = nb * chromaFade + luma * cf;
+        const nm = 1 + (1 - luma / 255) * 0.6;
+        const n  = (xrand() - 0.5) * noiseAmt * nm;
+        d[i]   = Math.max(0, Math.min(255, nr * rGain + rBias + driftR + n));
+        d[i+1] = Math.max(0, Math.min(255, ng * gGain + gBias + driftG + n));
+        d[i+2] = Math.max(0, Math.min(255, nb * bGain + bBias + driftB + n));
+      }
+    }
+    return imageData;
+  }
+
+  function applyPreJpegColorShift(ctx, w, h) {
+    const id = ctx.getImageData(0, 0, w, h);
+    const d  = id.data;
+    const rS = Helpers.randFloat(-2.0, 2.0), gS = Helpers.randFloat(-2.0, 2.0), bS = Helpers.randFloat(-2.0, 2.0);
+    for (let i = 0; i < d.length; i += 4) {
+      d[i]   = Math.max(0, Math.min(255, d[i]   + rS));
+      d[i+1] = Math.max(0, Math.min(255, d[i+1] + gS));
+      d[i+2] = Math.max(0, Math.min(255, d[i+2] + bS));
+    }
+    ctx.putImageData(id, 0, 0);
+  }
+
+  function applySharpen(ctx, w, h) {
+    const amount = Helpers.randFloat(0.08, 0.22);
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const tc = tmp.getContext('2d');
+    tc.filter = 'blur(1px)';
+    tc.drawImage(ctx.canvas, 0, 0);
+    tc.filter = 'none';
+    const original = ctx.getImageData(0, 0, w, h);
+    const blurred  = tc.getImageData(0, 0, w, h);
+    const od = original.data, bd = blurred.data;
+    for (let i = 0; i < od.length; i += 4) {
+      od[i]   = Math.max(0, Math.min(255, od[i]   + amount * (od[i]   - bd[i])));
+      od[i+1] = Math.max(0, Math.min(255, od[i+1] + amount * (od[i+1] - bd[i+1])));
+      od[i+2] = Math.max(0, Math.min(255, od[i+2] + amount * (od[i+2] - bd[i+2])));
+    }
+    ctx.putImageData(original, 0, 0);
+  }
+
+  function pickJpegQualities() {
+    const pairs = [
+      [0.93, 0.85],[0.91, 0.89],[0.92, 0.87],[0.94, 0.86],
+      [0.90, 0.88],[0.93, 0.89],[0.91, 0.85],[0.95, 0.84],[0.92, 0.88],
+    ];
+    return Helpers.pick(pairs);
+  }
+
+  function pickResolutionScale() { return Helpers.randFloat(0.993, 1.0); }
+
+  // ── ФОТО: полный конвейер ─────────────────────────────
+  function applyEffectsToImage(base64, onStep) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const w = img.naturalWidth, h = img.naturalHeight;
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+          onStep && onStep('shift');
+          const blurPx = Helpers.randFloat(0.2, 0.4).toFixed(2);
+          const subX   = Helpers.randFloat(-0.4, 0.4);
+          const subY   = Helpers.randFloat(-0.4, 0.4);
+          ctx.filter = `blur(${blurPx}px)`;
+          ctx.drawImage(img, subX, subY, w, h);
+          ctx.filter = 'none';
+          onStep && onStep('blur');
+
+          onStep && onStep('gamma');
+          const id = ctx.getImageData(0, 0, w, h);
+          onStep && onStep('noise');
+          ctx.putImageData(applyPixelPass(id, w, h), 0, 0);
+
+          onStep && onStep('vignette');
+          applyVignette(ctx, w, h);
+
+          onStep && onStep('preshift');
+          applyPreJpegColorShift(ctx, w, h);
+
+          onStep && onStep('sharpen');
+          applySharpen(ctx, w, h);
+
+          const scale = pickResolutionScale();
+          const w2 = Math.round(w * scale), h2 = Math.round(h * scale);
+          const resCanvas = document.createElement('canvas');
+          resCanvas.width = w2; resCanvas.height = h2;
+          resCanvas.getContext('2d').drawImage(canvas, 0, 0, w2, h2);
+
+          onStep && onStep('pass1');
+          const [q1, q2] = pickJpegQualities();
+          const pass1 = resCanvas.toDataURL('image/jpeg', q1);
+
+          const img2 = new Image();
+          img2.onload = () => {
+            try {
+              const c2 = document.createElement('canvas');
+              c2.width = w2; c2.height = h2;
+              c2.getContext('2d').drawImage(img2, 0, 0, w2, h2);
+              resolve(c2.toDataURL('image/jpeg', q2));
+            } catch (e) { reject(new Error('pass2: ' + e.message)); }
+          };
+          img2.onerror = () => reject(new Error('pass1 reload failed'));
+          img2.src = pass1;
+        } catch (e) { reject(new Error('photo pipeline: ' + e.message)); }
+      };
+      img.onerror = () => reject(new Error('source load failed'));
+      img.src = base64;
+    });
+  }
+
+  // ── ВИДЕО: GPU-pipeline — NO getImageData/putImageData in hot path ──
+  // Архитектура: offCanvas (blur) → mainCanvas (filter + noise overlay + vignette)
+  // → captureStream. Всё на GPU, CPU только при init для noise-текстур.
+
+  function pickVideoMimeType() {
+    const candidates = [
+      { mime: 'video/mp4;codecs=avc1,mp4a.40.2', ext: 'mp4' },
+      { mime: 'video/mp4;codecs=avc1',            ext: 'mp4' },
+      { mime: 'video/mp4',                         ext: 'mp4' },
+      { mime: 'video/webm;codecs=vp9,opus',        ext: 'webm' },
+      { mime: 'video/webm;codecs=vp8,opus',        ext: 'webm' },
+      { mime: 'video/webm',                         ext: 'webm' },
+    ];
+    for (const c of candidates) {
+      if (MediaRecorder.isTypeSupported(c.mime)) return c;
+    }
+    return { mime: '', ext: 'webm' };
+  }
+
+  // Генерируем N noise-канвасов на CPU один раз при старте.
+  // Половинное разрешение → растяжение при drawImage даёт органичную вариацию.
+  function buildNoiseFrames(w, h, count) {
+    const hw = Math.ceil(w / 2), hh = Math.ceil(h / 2);
+    return Array.from({ length: count }, () => {
+      const nc   = document.createElement('canvas');
+      nc.width   = hw; nc.height = hh;
+      const nCtx = nc.getContext('2d');
+      const id   = nCtx.createImageData(hw, hh);
+      const d    = id.data;
+      // Граница ярче — имитируем edge noise без getImageData в hot path
+      for (let y = 0; y < hh; y++) {
+        const ey = Math.abs(y / hh - 0.5) * 2; // 0 centre → 1 edge
+        for (let x = 0; x < hw; x++) {
+          const ex   = Math.abs(x / hw - 0.5) * 2;
+          const edge = 1 + Math.max(ex, ey) * 0.5;
+          const v    = Math.random() * 255 * edge | 0;
+          const i    = (y * hw + x) * 4;
+          d[i] = d[i+1] = d[i+2] = Math.min(255, v);
+          d[i+3] = 255;
+        }
+      }
+      nCtx.putImageData(id, 0, 0);
+      return nc;
+    });
+  }
+
+  function processVideo(file, onStep, onProgress) {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(file);
+      video.muted = false;
+      video.playsInline = true;
+      video.crossOrigin = 'anonymous';
+
+      video.onloadedmetadata = () => {
+        const w = video.videoWidth, h = video.videoHeight;
+        if (!w || !h) { reject(new Error('Не удалось получить размеры видео')); return; }
+
+        // ── offCanvas: промежуточный canvas для blur-прохода ──
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = w; offCanvas.height = h;
+        const offCtx = offCanvas.getContext('2d');
+
+        // ── mainCanvas: финальный, захватывается captureStream ──
+        const mainCanvas = document.createElement('canvas');
+        mainCanvas.width = w; mainCanvas.height = h;
+        const ctx = mainCanvas.getContext('2d');
+
+        // ── Параметры (один раз на ролик) ──────────────────
+        const blurPx = Helpers.randFloat(0.2, 0.4).toFixed(2);
+
+        // Gamma / contrast / saturation → ctx.filter (GPU)
+        const brightness = Helpers.randFloat(0.96, 1.04).toFixed(4);
+        const contrast   = Helpers.randFloat(1.005, 1.025).toFixed(4);
+        const saturation = Helpers.randFloat(0.97, 1.0).toFixed(4);
+        const colorFilter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`;
+
+        // Noise opacity (map original noiseAmt 3-7 → 0.04–0.10)
+        const noiseAmt    = Helpers.randFloat(3, 7);
+        const noiseOpacity = noiseAmt / 7 * 0.08 + 0.02; // 0.02–0.10
+
+        // Пре-генерируем 10 noise-кадров (CPU, один раз)
+        const NOISE_FRAMES = 10;
+        const noiseFrames = buildNoiseFrames(w, h, NOISE_FRAMES);
+
+        // Vignette ≤2% (gradient создаётся один раз)
+        const vigStrength = Helpers.randFloat(0.01, 0.02);
+        const cx = w/2, cy = h/2, r0 = Math.sqrt(cx*cx+cy*cy);
+        const vigGrad = ctx.createRadialGradient(cx, cy, r0*0.42, cx, cy, r0);
+        vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        vigGrad.addColorStop(1, `rgba(0,0,0,${vigStrength.toFixed(4)})`);
+
+        // ── Аудио ───────────────────────────────────────────
+        const videoStream = mainCanvas.captureStream(30);
+        let audioTracks = [];
+        try {
+          const audioCtx = new AudioContext();
+          const src  = audioCtx.createMediaElementSource(video);
+          const dest = audioCtx.createMediaStreamDestination();
+          src.connect(dest);
+          src.connect(audioCtx.destination);
+          audioTracks = dest.stream.getAudioTracks();
+        } catch (e) { /* нет аудио — не критично */ }
+
+        const combinedStream = new MediaStream([
+          ...videoStream.getVideoTracks(),
+          ...audioTracks
+        ]);
+
+        const { mime: mimeType, ext } = pickVideoMimeType();
+        const recOpts = { videoBitsPerSecond: 8_000_000 };
+        if (mimeType) recOpts.mimeType = mimeType;
+
+        const recorder = new MediaRecorder(combinedStream, recOpts);
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        recorder.onstop = () => {
+          URL.revokeObjectURL(video.src);
+          const blobMime = mimeType || (ext === 'mp4' ? 'video/mp4' : 'video/webm');
+          resolve({ blob: new Blob(chunks, { type: blobMime }), ext });
+        };
+
+        const duration    = video.duration;
+        let frameCount    = 0;
+        let lastFrameTs   = 0;
+        const FRAME_MS    = 1000 / 30; // ~33ms = 30fps cap
+
+        // ── Hot path: ТОЛЬКО GPU-операции ──────────────────
+        // getImageData/putImageData здесь НЕТ.
+        function drawFrame(ts) {
+          if (video.ended || video.paused) { recorder.stop(); return; }
+
+          // FPS throttle — не рендерим быстрее 30fps
+          if (ts - lastFrameTs < FRAME_MS) {
+            requestAnimationFrame(drawFrame);
+            return;
+          }
+          lastFrameTs = ts;
+
+          const subX = (Math.random() - 0.5) * 0.4;
+          const subY = (Math.random() - 0.5) * 0.4;
+
+          // 1. Blur + subpixel shift → offCanvas
+          offCtx.filter = `blur(${blurPx}px)`;
+          offCtx.drawImage(video, subX, subY, w, h);
+          offCtx.filter = 'none';
+
+          // 2. Gamma / contrast / saturation → mainCanvas (GPU filter)
+          ctx.filter = colorFilter;
+          ctx.drawImage(offCanvas, 0, 0, w, h);
+          ctx.filter = 'none';
+
+          // 3. Noise overlay (cycle noise frames, overlay blend = экранный шум)
+          const noiseIdx = frameCount % NOISE_FRAMES;
+          ctx.globalCompositeOperation = 'overlay';
+          ctx.globalAlpha = noiseOpacity;
+          ctx.drawImage(noiseFrames[noiseIdx], 0, 0, w, h); // half-res → stretch
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
+
+          // 4. Vignette ≤2%
+          ctx.fillStyle = vigGrad;
+          ctx.fillRect(0, 0, w, h);
+
+          frameCount++;
+          if (!isNaN(duration) && duration > 0) onProgress && onProgress(video.currentTime / duration);
+          requestAnimationFrame(drawFrame);
+        }
+
+        onStep && onStep('blur');
+        recorder.start(200);
+        video.play().then(() => requestAnimationFrame(drawFrame)).catch(reject);
+        video.onended = () => setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 400);
+      };
+
+      video.onerror = () => reject(new Error('Не удалось загрузить видео: ' + file.name));
+    });
+  }
+
+  return { applyEffectsToImage, processVideo };
+})();
+
+
+// ─────────────────────────────────────────────────────────
+// UI
+// ─────────────────────────────────────────────────────────
+const UI = (() => {
+  let currentMode    = 'Daylight';
+  let currentProcMode = 'both'; // 'metadata' | 'postprocess' | 'both'
+
+  function init() {
+    try {
+      const phoneSel = document.getElementById('phone');
+      Data.phoneNames.forEach(name => {
+        const opt = document.createElement('option'); opt.textContent = name; phoneSel.appendChild(opt);
+      });
+      const placeSel = document.getElementById('place');
+      Object.keys(Data.places).forEach(name => {
+        const opt = document.createElement('option'); opt.textContent = name; placeSel.appendChild(opt);
+      });
+
+      // File change → thumbnails + info
+      document.getElementById('files').addEventListener('change', e => {
+        const files = [...e.target.files].slice(0, 5);
+        const imgs  = files.filter(f => f.type.startsWith('image/')).length;
+        const vids  = files.filter(f => f.type.startsWith('video/')).length;
+        let info = '';
+        if (imgs) info += imgs + ' фото';
+        if (imgs && vids) info += ' + ';
+        if (vids) info += vids + ' видео';
+        if (!imgs && !vids) info = '0 файлов';
+        document.getElementById('fileInfo').textContent = '📷 Выбрано: ' + info;
+        document.getElementById('videoNote').classList.toggle('show', vids > 0);
+
+        const onlyVideo = vids > 0 && imgs === 0;
+        ['pp-preshift','pp-sharpen','pp-pass1'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.toggle('disabled-step', onlyVideo);
+        });
+
+        // Thumbnails
+        renderThumbnails(files);
+      });
+
+      // Shooting mode
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentMode = btn.dataset.mode;
+          updateParamsPreview();
+        });
+      });
+
+      // Processing mode
+      document.querySelectorAll('.proc-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.proc-mode-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentProcMode = btn.dataset.pm;
+          updateProcModeUI();
+        });
+      });
+
+      updateParamsPreview();
+      updateProcModeUI();
+      initMap();
+    } catch (err) {
+      Helpers.showToast('UI.init', 'Ошибка инициализации: ' + err.message);
+    }
+  }
+
+  // ── Thumbnails ────────────────────────────────────────
+  function renderThumbnails(files) {
+    const wrap = document.getElementById('thumbsWrap');
+    const grid = document.getElementById('thumbsGrid');
+    grid.innerHTML = '';
+
+    if (!files.length) { wrap.classList.remove('visible'); return; }
+    wrap.classList.add('visible');
+
+    files.forEach(file => {
+      const item = document.createElement('div');
+      item.className = 'thumb-item';
+
+      const label = document.createElement('div');
+      label.className = 'thumb-label';
+      label.textContent = file.name;
+
+      const badge = document.createElement('div');
+
+      if (file.type.startsWith('image/')) {
+        badge.className = 'thumb-badge img';
+        badge.textContent = 'IMG';
+        const img = document.createElement('img');
+        const url = URL.createObjectURL(file);
+        img.src = url;
+        img.onload = () => URL.revokeObjectURL(url);
+        img.alt = file.name;
+        item.appendChild(img);
+      } else if (file.type.startsWith('video/')) {
+        badge.className = 'thumb-badge vid';
+        badge.textContent = 'VID';
+        // Capture first frame via a temp video element
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        const url = URL.createObjectURL(file);
+        video.src = url;
+        video.currentTime = 0.5; // seek to 0.5s for thumbnail
+        video.addEventListener('seeked', () => {
+          const cvs = document.createElement('canvas');
+          cvs.width = 192; cvs.height = 192;
+          const c = cvs.getContext('2d');
+          // crop square from center
+          const vw = video.videoWidth, vh = video.videoHeight;
+          const side = Math.min(vw, vh);
+          c.drawImage(video, (vw - side)/2, (vh - side)/2, side, side, 0, 0, 192, 192);
+          const imgEl = document.createElement('img');
+          imgEl.src = cvs.toDataURL('image/jpeg', 0.8);
+          imgEl.alt = file.name;
+          item.insertBefore(imgEl, item.firstChild);
+          URL.revokeObjectURL(url);
+        }, { once: true });
+        video.addEventListener('error', () => {
+          // fallback icon
+          const icon = document.createElement('div');
+          icon.className = 'thumb-video-icon';
+          icon.textContent = '🎬';
+          item.appendChild(icon);
+          URL.revokeObjectURL(url);
+        }, { once: true });
+        video.load();
+      } else {
+        badge.className = 'thumb-badge';
+        badge.textContent = '?';
+        const icon = document.createElement('div');
+        icon.className = 'thumb-video-icon';
+        icon.textContent = '📄';
+        item.appendChild(icon);
+      }
+
+      item.appendChild(badge);
+      item.appendChild(label);
+      grid.appendChild(item);
+    });
+  }
+
+  // ── Processing mode UI ────────────────────────────────
+  function updateProcModeUI() {
+    const doMeta = currentProcMode === 'metadata' || currentProcMode === 'both';
+    const doPP   = currentProcMode === 'postprocess' || currentProcMode === 'both';
+
+    // Dim/undim cards
+    document.querySelectorAll('.card-metadata').forEach(el => {
+      el.classList.toggle('dimmed', !doMeta);
+    });
+    document.querySelectorAll('.card-postprocess').forEach(el => {
+      el.classList.toggle('dimmed', !doPP);
+    });
+
+    // Status line
+    const status = document.getElementById('pmStatus');
+    status.innerHTML = `
+      <span class="pm-tag ${doMeta ? 'on' : 'off'}">🏷️ EXIF/GPS замена</span>
+      <span class="pm-tag ${doPP  ? 'on' : 'off'}">🎨 Визуальная постобработка</span>
+      <span class="pm-tag ${doPP  ? 'on' : 'off'}">🌫️ Blur + шум + гамма</span>
+      <span class="pm-tag ${doPP  ? 'on' : 'off'}">🗜️ JPEG деградация</span>
+    `;
+  }
+
+  function getMode()     { return currentMode; }
+  function getProcMode() { return currentProcMode; }
+
+  function updateParamsPreview() {
+    try {
+      const p = Data.generateShootingParams(currentMode);
+      document.getElementById('paramsPreview').innerHTML = `
+        <div class="param-chip"><span class="pk">ISO</span><span class="pv">${p.iso}</span></div>
+        <div class="param-chip"><span class="pk">Выдержка</span><span class="pv">1/${p.expDen}s</span></div>
+        <div class="param-chip"><span class="pk">Вспышка</span><span class="pv">${p.flash === 0 ? 'нет' : 'есть'}</span></div>
+        <div class="param-chip"><span class="pk">WB</span><span class="pv">${p.whiteBalance === 0 ? 'авто' : 'manual'}</span></div>
+      `;
+    } catch (err) { Helpers.showToast('UI.updateParamsPreview', err.message); }
+  }
+
+  function setProgress(pct, label) {
+    const wrap = document.getElementById('progressWrap');
+    const bar  = document.getElementById('progressBar');
+    const lbl  = document.getElementById('progressLabel');
+    wrap.classList.add('visible');
+    bar.style.width  = pct + '%';
+    lbl.textContent  = label;
+    if (pct >= 100) setTimeout(() => { wrap.classList.remove('visible'); bar.style.width = '0%'; }, 1200);
+  }
+
+  function highlightStep(stepId) {
+    document.querySelectorAll('.pp-step').forEach(el => el.classList.remove('active'));
+    if (stepId) { const el = document.getElementById('pp-' + stepId); if (el) el.classList.add('active'); }
+  }
+
+  function setLocked(locked) {
+    document.getElementById('btnProcess').disabled = locked;
+    document.getElementById('btnRand').disabled    = locked;
+  }
+
+  function randomize() {
+    try {
+      const phones    = Data.phoneNames;
+      const placeKeys = Object.keys(Data.places);
+      document.getElementById('phone').value = phones[Helpers.randInt(0, phones.length - 1)];
+      document.getElementById('place').value = placeKeys[Helpers.randInt(0, placeKeys.length - 1)];
+      const d   = new Date(Date.now() - Math.random() * 700 * 86400000);
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('time').value =
+        `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      const modes = ['Daylight','Indoor','Night','Club','Selfie'];
+      const mode  = modes[Helpers.randInt(0, modes.length - 1)];
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+      currentMode = mode;
+      updateParamsPreview();
+      Helpers.showToast('Рандомизация', 'Данные заполнены случайным образом', 'success');
+    } catch (err) { Helpers.showToast('UI.randomize', err.message); }
+  }
+
+  function initMap() {
+    try {
+      setTimeout(() => {
+        const mapEl = document.getElementById('map');
+        mapEl.textContent = '';
+        const map = new google.maps.Map(mapEl, {
+          center: { lat: 48.137154, lng: 11.576124 }, zoom: 3,
+          mapTypeControl: false, streetViewControl: false,
+          styles: [
+            { elementType: 'geometry',           stylers: [{ color: '#1a2235' }] },
+            { elementType: 'labels.text.fill',   stylers: [{ color: '#64748b' }] },
+            { featureType: 'water',              stylers: [{ color: '#0a0e1a' }] },
+            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#243050' }] }
+          ]
+        });
+        let marker = null;
+        map.addListener('click', e => {
+          window._pickedLat = e.latLng.lat();
+          window._pickedLng = e.latLng.lng();
+          if (marker) marker.setMap(null);
+          marker = new google.maps.Marker({ position: e.latLng, map });
+        });
+      }, 300);
+    } catch (err) {
+      Helpers.showToast('UI.initMap', err.message);
+      document.getElementById('map').textContent = '⚠️ Карта недоступна';
+    }
+  }
+
+  return { init, getMode, getProcMode, randomize, setProgress, highlightStep, setLocked };
+})();
+
+
+// ─────────────────────────────────────────────────────────
+// IMAGE PROCESSING
+// ─────────────────────────────────────────────────────────
+const ImageProcessing = (() => {
+
+  function buildExif(profile, shootParams, lat, lon, dtStr) {
+    const exif = { '0th': {}, 'Exif': {}, 'GPS': {}, 'Interop': {}, '1st': {}, 'thumbnail': null };
+    exif['0th'][piexif.ImageIFD.Make]             = profile.make;
+    exif['0th'][piexif.ImageIFD.Model]            = profile.model;
+    exif['0th'][piexif.ImageIFD.Software]         = '';
+    exif['0th'][piexif.ImageIFD.DateTime]         = dtStr;
+    exif['0th'][piexif.ImageIFD.XResolution]      = [72, 1];
+    exif['0th'][piexif.ImageIFD.YResolution]      = [72, 1];
+    exif['0th'][piexif.ImageIFD.ResolutionUnit]   = 2;
+    exif['0th'][piexif.ImageIFD.Orientation]      = 1;
+    exif['0th'][piexif.ImageIFD.YCbCrPositioning] = 1;
+    exif['Exif'][piexif.ExifIFD.DateTimeOriginal]  = dtStr;
+    exif['Exif'][piexif.ExifIFD.DateTimeDigitized] = dtStr;
+    exif['Exif'][piexif.ExifIFD.FNumber]           = profile.fnum;
+    exif['Exif'][piexif.ExifIFD.ExposureTime]      = [shootParams.expNum, shootParams.expDen];
+    exif['Exif'][piexif.ExifIFD.ShutterSpeedValue] = [shootParams.ssApex, 100];
+    exif['Exif'][piexif.ExifIFD.ISOSpeedRatings]   = shootParams.iso;
+    exif['Exif'][piexif.ExifIFD.Flash]             = shootParams.flash;
+    exif['Exif'][piexif.ExifIFD.FocalLength]       = profile.focal;
+    exif['Exif'][piexif.ExifIFD.LensModel]         = profile.lens;
+    exif['Exif'][piexif.ExifIFD.ExposureProgram]   = profile.program;
+    exif['Exif'][piexif.ExifIFD.ExifVersion]       = '0232';
+    exif['Exif'][piexif.ExifIFD.PixelXDimension]   = 4000;
+    exif['Exif'][piexif.ExifIFD.PixelYDimension]   = 3000;
+    exif['Exif'][piexif.ExifIFD.ColorSpace]        = 1;
+    exif['Exif'][piexif.ExifIFD.SceneType]         = '1';
+    exif['Exif'][piexif.ExifIFD.WhiteBalance]  = shootParams.whiteBalance;
+    exif['Exif'][piexif.ExifIFD.MeteringMode]  = shootParams.meteringMode;
+    exif['GPS'][piexif.GPSIFD.GPSLatitudeRef]  = lat >= 0 ? 'N' : 'S';
+    exif['GPS'][piexif.GPSIFD.GPSLatitude]     = Helpers.degToRat(lat);
+    exif['GPS'][piexif.GPSIFD.GPSLongitudeRef] = lon >= 0 ? 'E' : 'W';
+    exif['GPS'][piexif.GPSIFD.GPSLongitude]    = Helpers.degToRat(lon);
+    return exif;
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = () => reject(new Error('Не удалось прочитать: ' + file.name));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Convert any image to JPEG base64 via canvas (handles PNG, WebP, AVIF etc.)
+  function convertToJpegBase64(originalBase64) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const cvs = document.createElement('canvas');
+        cvs.width = img.naturalWidth; cvs.height = img.naturalHeight;
+        cvs.getContext('2d').drawImage(img, 0, 0);
+        resolve(cvs.toDataURL('image/jpeg', 0.96));
+      };
+      img.onerror = () => reject(new Error('image conversion failed'));
+      img.src = originalBase64;
+    });
+  }
+
+  async function processFiles() {
+    const WHERE = 'processFiles';
+    const files = [...document.getElementById('files').files].slice(0, 5);
+    if (!files.length) { Helpers.showToast(WHERE, 'Выберите хотя бы один файл'); return; }
+
+    const procMode = UI.getProcMode(); // 'metadata' | 'postprocess' | 'both'
+    const doMeta   = procMode === 'metadata'    || procMode === 'both';
+    const doPP     = procMode === 'postprocess' || procMode === 'both';
+
+    // Validate metadata fields only if needed
+    let dtStr = '', lat = 0, lon = 0, profile = null, mode = '';
+    if (doMeta) {
+      const rawTime = document.getElementById('time').value.trim();
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rawTime)) {
+        Helpers.showToast(WHERE + ' → время', 'Формат: YYYY-MM-DD HH:MM:SS'); return;
+      }
+      dtStr = Helpers.fmtDateForExif(rawTime);
+
+      if (window._pickedLat != null) {
+        lat = window._pickedLat; lon = window._pickedLng;
+      } else {
+        const placeKey = document.getElementById('place').value;
+        const coords   = Data.places[placeKey];
+        if (!coords) { Helpers.showToast(WHERE + ' → локация', 'Выберите локацию или кликните по карте'); return; }
+        [lat, lon] = coords;
+      }
+
+      const phoneName = document.getElementById('phone').value;
+      const baseProfile = Data.cameraProfiles[phoneName];
+      if (!baseProfile) { Helpers.showToast(WHERE + ' → устройство', 'Неизвестная модель: ' + phoneName); return; }
+      profile = { ...baseProfile, model: phoneName };
+      mode    = UI.getMode();
+    }
+
+    UI.setLocked(true);
+    UI.setProgress(2, 'Инициализация…');
+
+    let seriesBase = null;
+    let processedCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file      = files[i];
+      const label     = `"${file.name}" [${i+1}/${files.length}]`;
+      const baseOff   = (i / files.length) * 100;
+      const step      = 100 / files.length;
+      const isVideo   = file.type.startsWith('video/');
+      const isImage   = file.type.startsWith('image/');
+
+      if (!isVideo && !isImage) {
+        Helpers.showToast(WHERE, `${file.name}: неподдерживаемый тип "${file.type}", пропускаем`);
+        continue;
+      }
+
+      try {
+        // ── ИЗОБРАЖЕНИЕ ──────────────────────────────────
+        if (isImage) {
+          UI.setProgress(baseOff + step * 0.05, `Читаю ${label}…`);
+          let base64 = await fileToBase64(file);
+
+          // Ensure it's a JPEG data URL so piexif can handle it
+          if (!base64.startsWith('data:image/jpeg') && !base64.startsWith('data:image/jpg')) {
+            UI.setProgress(baseOff + step * 0.07, `Конвертирую в JPEG · ${label}…`);
+            base64 = await convertToJpegBase64(base64);
+          }
+
+          let resultBase64 = base64;
+
+          // ── Post-processing ──
+          if (doPP) {
+            const stepMap = {
+              shift:    { label: 'SubPixel shift…',      pct: .08 },
+              blur:     { label: 'Micro-blur…',           pct: .14 },
+              gamma:    { label: 'Гамма/LUT…',            pct: .24 },
+              noise:    { label: 'Edge-noise + chroma…',  pct: .40 },
+              vignette: { label: 'Виньетка(≤2%)+drift…', pct: .54 },
+              preshift: { label: 'Pre-JPEG colorshift…',  pct: .62 },
+              sharpen:  { label: 'Unsharp mask…',         pct: .70 },
+              pass1:    { label: 'JPEG нерег. pass 1…',   pct: .82 },
+            };
+            const onStep = id => {
+              UI.highlightStep(id);
+              UI.setProgress(baseOff + step * (stepMap[id]?.pct || 0.5),
+                (stepMap[id]?.label || id) + ' · ' + label);
+            };
+            try {
+              resultBase64 = await PostProcess.applyEffectsToImage(base64, onStep);
+            } catch (err) {
+              Helpers.showToast(WHERE + ' → PostProcess', `${file.name}: ${err.message}`);
+              resultBase64 = base64;
+            }
+          }
+
+          // ── EXIF metadata ──
+          if (doMeta) {
+            UI.setProgress(baseOff + step * 0.93, `Вставка EXIF · ${label}`);
+            const shootParams = Data.generateShootingParams(mode, seriesBase);
+            if (!seriesBase) seriesBase = { ...shootParams };
+            try {
+              const exifStr = piexif.dump(buildExif(profile, shootParams, lat, lon, dtStr));
+              resultBase64  = piexif.insert(exifStr, resultBase64);
+            } catch (err) {
+              Helpers.showToast(WHERE + ' → EXIF', `${file.name}: ${err.message}`);
+            }
+          }
+
+          const a = document.createElement('a');
+          a.href     = resultBase64;
+          a.download = file.name.replace(/\.[^.]+$/, '') + '_meta.jpg';
+          a.click();
+
+        // ── ВИДЕО ────────────────────────────────────────
+        } else {
+          UI.setProgress(baseOff + step * 0.05, `Готовлю видео ${label}…`);
+
+          let result;
+
+          if (doPP) {
+            Helpers.showToast('Видео', `Начало обработки ${file.name} — займёт столько же, сколько длится ролик`);
+            const onStep = id => {
+              UI.highlightStep(id);
+              UI.setProgress(baseOff + step * 0.1, `Видео: конвейер запущен · ${label}`);
+            };
+            const onVidProgress = ratio => {
+              UI.setProgress(baseOff + step * 0.1 + step * 0.85 * ratio,
+                `Видео: ${Math.round(ratio * 100)}% · ${label}`);
+            };
+            try {
+              result = await PostProcess.processVideo(file, onStep, onVidProgress);
+            } catch (err) {
+              Helpers.showToast(WHERE + ' → Video', `${file.name}: ${err.message}`);
+              continue;
+            }
+          } else {
+            // metadata-only for video: just re-package the file as-is
+            // (video containers don't support EXIF in the browser without ffmpeg,
+            //  so we just pass the file through and rename)
+            const ext = file.name.split('.').pop().toLowerCase();
+            result = { blob: file, ext: ext === 'mp4' ? 'mp4' : ext };
+            Helpers.showToast('Видео', `Режим "только метаданные": для видео метаданные в браузере недоступны. Файл скопирован без изменений.`);
+          }
+
+          const url  = URL.createObjectURL(result.blob);
+          const a    = document.createElement('a');
+          a.href     = url;
+          a.download = file.name.replace(/\.[^.]+$/, '') + '_meta.' + result.ext;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+
+        processedCount++;
+        UI.setProgress(baseOff + step, `Готово: ${label}`);
+
+      } catch (err) {
+        Helpers.showToast(WHERE, `${file.name}: ${err.message}`);
+      }
+    }
+
+    UI.highlightStep(null);
+    UI.setLocked(false);
+    UI.setProgress(100, `✅ Обработано ${processedCount} из ${files.length} файлов`);
+    Helpers.showToast('Готово', `Обработано ${processedCount} файл(ов) · режим: ${UI.getProcMode()}`, 'success');
+  }
+
+  return { processFiles };
+})();
+
+
+// ─────────────────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  try { UI.init(); }
+  catch (err) { Helpers.showToast('BOOT', 'Критическая ошибка: ' + err.message); }
+});
+</script>
+</body>
+</html>
